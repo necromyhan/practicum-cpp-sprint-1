@@ -51,7 +51,24 @@ public:
         ProcessCipher(inStream, outStream, ctx.get());
     }
 
-    void DecryptFile(std::iostream &inStream, std::iostream &outStream, std::string_view password) {}
+    void DecryptFile(std::iostream &inStream, std::iostream &outStream, std::string_view password) {
+        CheckStreams(inStream, outStream);
+
+        AesCipherParams params = CreateCipherParamsFromPassword(password);
+        params.encrypt = 0;
+
+        EvpCipherCtxPtr ctx(EVP_CIPHER_CTX_new());
+        if (!ctx) {
+            throw std::runtime_error("Не удалось создать EVP_CIPHER_CTX");
+        }
+
+        if (EVP_CipherInit_ex(ctx.get(), params.cipher, nullptr, params.key.data(), params.iv.data(), params.encrypt) !=
+            1) {
+            throw std::runtime_error("Не удалось инициализировать cipher");
+        }
+
+        ProcessCipher(inStream, outStream, ctx.get());
+    }
 
     std::string CalculateChecksum(std::iostream &inStream) { return "NOT_IMPLEMENTED"; }
 
