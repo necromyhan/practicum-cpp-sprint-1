@@ -79,3 +79,21 @@ TEST(CryptoGuardDecryptTest, ThrowsOnCorruptedCiphertext) {
     ASSERT_NO_THROW(guard.DecryptFile(corruptedStream, plainStream, "pass"));
     ASSERT_NE(plainStream.str(), in.str());
 }
+
+// Checksum. Валидный подсчет
+TEST(CryptoGuardChecksumTest, ChecksumValidSha256) {
+    CryptoGuard::CryptoGuardCtx guard;
+    std::stringstream in("abc");
+
+    std::string checksum = guard.CalculateChecksum(in);
+    ASSERT_EQ(checksum, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+}
+
+// Checksum. Валидный подсчет пустой строки
+TEST(CryptoGuardChecksumTest, EmptyStringChecksum) {
+    CryptoGuard::CryptoGuardCtx guard;
+    std::stringstream in("");
+
+    std::string checksum = guard.CalculateChecksum(in);
+    ASSERT_EQ(checksum, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+}

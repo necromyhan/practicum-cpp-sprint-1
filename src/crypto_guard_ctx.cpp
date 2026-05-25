@@ -1,8 +1,10 @@
 #include "crypto_guard_ctx.h"
 #include <array>
+#include <iomanip>
 #include <iostream>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <sstream>
 #include <vector>
 
 namespace CryptoGuard {
@@ -14,7 +16,15 @@ struct EvpCipherCtxDeleter {
     }
 };
 
+struct EvpMdCtxDeleter {
+    void operator()(EVP_MD_CTX *ctx) const {
+        if (ctx)
+            EVP_MD_CTX_free(ctx);
+    }
+};
+
 using EvpCipherCtxPtr = std::unique_ptr<EVP_CIPHER_CTX, EvpCipherCtxDeleter>;
+using EvpMdCtxPtr = std::unique_ptr<EVP_MD_CTX, EvpMdCtxDeleter>;
 
 struct AesCipherParams {
     static const size_t KEY_SIZE = 32;             // AES-256 key size
@@ -70,7 +80,42 @@ public:
         ProcessCipher(inStream, outStream, ctx.get());
     }
 
-    std::string CalculateChecksum(std::iostream &inStream) { return "NOT_IMPLEMENTED"; }
+    std::string CalculateChecksum(std::iostream &inStream) {
+        if (!inStream) {
+            throw std::runtime_error("Не валидный входной поток");
+        }
+
+        EvpMdCtxPtr mdCtx(EVP_MD_CTX_new());
+        if (!mdCtx) {
+            throw std::runtime_error("Не удалось создать EVP_MD_CTX:");
+        }
+
+        if (EVP_DigestInit_ex(mdCtx.get(), EVP_sha256(), nullptr) != 1) {
+            throw std::runtime_error("Не удалось инициализировать SHA-256 digest");
+        }
+
+        std::vector<char> buffer(4096);
+        while (inStream.read(buffer.data(), buffer.size()) || inStream.gcount() > 0) {
+            if (inStream.bad()) {
+                throw std::runtime_error("Не валидный входной поток");
+            }
+            if (EVP_DigestUpdate(mdCtx.get(), buffer.data(), inStream.gcount()) != 1) {
+                throw std::runtime_error("Не удалось обновить SHA-256 digest");
+            }
+        }
+
+        unsigned int mdLen = 0;
+        std::array<unsigned char, EVP_MAX_MD_SIZE> mdBuf;
+        if (EVP_DigestFinal_ex(mdCtx.get(), mdBuf.data(), &mdLen) != 1) {
+            throw std::runtime_error("Не удалось обновить SHA-256 digest");
+        }
+
+        std::stringstream ss;
+        for (unsigned int i = 0; i < mdLen; ++i) {
+            ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(mdBuf[i]);
+        }
+        return ss.str();
+    }
 
 private:
     void CheckStreams(const std::iostream &in, const std::iostream &out) {
