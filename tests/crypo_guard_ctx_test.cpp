@@ -61,23 +61,22 @@ TEST(CryptoGuardDecryptTest, BadPassword) {
     ASSERT_THROW(guard.DecryptFile(cipherStream, plainStream, "WrongPassword"), std::runtime_error);
 }
 
-// Decrypt. Неверный пароль
+// Decrypt. Поврежденный зашифрованный блок данных
 TEST(CryptoGuardDecryptTest, ThrowsOnCorruptedCiphertext) {
     CryptoGuard::CryptoGuardCtx guard;
-    std::stringstream in("Yandex Practicum Middle Cpp");
+    std::stringstream in("Data Block");
     std::stringstream cipherStream;
     std::stringstream plainStream;
 
-    guard.EncryptFile(in, cipherStream, "pass");
+    guard.EncryptFile(in, cipherStream, "Password");
 
     std::string corruptedData = cipherStream.str();
     if (!corruptedData.empty()) {
-        corruptedData[0] ^= 0xFF;  // Меняем бит в зашифрованных данных
+        corruptedData[1] ^= 0xFF;  // Меняем бит в зашифрованных данных
     }
     std::stringstream corruptedStream(corruptedData);
 
-    ASSERT_NO_THROW(guard.DecryptFile(corruptedStream, plainStream, "pass"));
-    ASSERT_NE(plainStream.str(), in.str());
+    ASSERT_THROW(guard.DecryptFile(corruptedStream, plainStream, "Password"), std::runtime_error);
 }
 
 // Checksum. Валидный подсчет
